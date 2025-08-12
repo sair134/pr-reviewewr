@@ -28,6 +28,7 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
 # 7️⃣ Note: CodeLlama model will be pulled at runtime
+RUN ollama pull codellama:7b
 # (This avoids long build times and potential timeout issues)
 
 # 8️⃣ Set up app directory
