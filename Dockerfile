@@ -44,4 +44,4 @@ COPY . .
 EXPOSE 3000
 
 # 1️⃣2️⃣ Start Ollama in background & then run Express
-CMD ["sh", "-c", "ollama serve & sleep 5 && node server.js"]
+CMD ["sh", "-c", "ollama serve & sleep 5 && npx ts-node server.js"]
