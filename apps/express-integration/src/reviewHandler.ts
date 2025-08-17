@@ -8,7 +8,7 @@ async function reviewWithAI(code: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'codellama:7b',
-      prompt: `Review the following TypeScript code for issues, bugs, or improvements:\n\n${code}`,
+      prompt: `you are an expert senior developer in typescript. Review the following TypeScript code for compilation issues, eslint issues, bugs, or improvements:\n\n${code}`,
       stream: false,
     }),
   });
@@ -37,7 +37,7 @@ export async function handlePRReview(platform: 'github' | 'bitbucket', prData: a
     })
   );
 
-  const hasIssues = results.some((r) => (r.issues && r.issues.length > 0) || r.aiFeedback.toLowerCase().includes('issue'));
+  const hasIssues = results.some((r) => (r.issues && r.issues.length > 0) || r.aiFeedback?.toLowerCase()?.includes('issue') || !r.aiFeedback);
 
 const body = results
     .map(

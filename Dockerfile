@@ -1,48 +1,57 @@
-# 1️⃣ Base image: use Node for the Express app
-FROM node:20-bullseye
+# Multi-stage build for the monorepo
+FROM node:18-alpine AS base
 
-# 2️⃣ Install dependencies for Ollama and linting tools
-RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    git \
-    python3 \
-    python3-pip \
-    openjdk-11-jdk \
-    golang-go \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
-
-# 3️⃣ Install Python linting tools
-RUN pip3 install pylint
-
-# 4️⃣ Install Checkstyle for Java
-RUN wget https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.12.5/checkstyle-10.12.5-all.jar -O /usr/local/bin/checkstyle.jar \
-    && echo '#!/bin/bash\njava -jar /usr/local/bin/checkstyle.jar "$@"' > /usr/local/bin/checkstyle \
-    && chmod +x /usr/local/bin/checkstyle
-
-# 5️⃣ Install golangci-lint
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin v1.55.2
-
-# 6️⃣ Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
-
-# 7️⃣ Note: CodeLlama model will be pulled at runtime
-RUN ollama serve & sleep 5 && ollama pull codellama:7b
-# (This avoids long build times and potential timeout issues)
- 
-# 8️⃣ Set up app directory
+# Install dependencies only when needed
+FROM base AS deps
 WORKDIR /app
 
-# 9️⃣ Copy package files & install dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm install --production
+COPY apps/express-integration/package*.json ./apps/express-integration/
+COPY apps/next-frontend/package*.json ./apps/next-frontend/
+COPY packages/shared/package*.json ./packages/shared/
 
-# 🔟 Copy rest of the app
+# Install dependencies
+RUN npm ci
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 1️⃣1️⃣ Expose Express port
-EXPOSE 3000
+# Build all applications
+RUN npm run build
 
-# 1️⃣2️⃣ Start Ollama in background & then run Express
-CMD ["sh", "-c", "ollama serve & sleep 5 && npx ts-node server.js"]
+# Production image, copy all the files and run the apps
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Create a non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy built applications
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/apps/next-frontend/public ./apps/next-frontend/public
+COPY --from=builder /app/apps/next-frontend/next.config.js ./apps/next-frontend/
+
+# Copy package files for runtime dependencies
+COPY package*.json ./
+COPY apps/express-integration/package*.json ./apps/express-integration/
+COPY apps/next-frontend/package*.json ./apps/next-frontend/
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Change ownership of the app directory
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000 3001
+
+# Start both applications
+CMD ["npm", "run", "start:production"]

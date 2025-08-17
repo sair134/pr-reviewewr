@@ -1,36 +1,55 @@
 {
-  "name": "automate",
+  "name": "automate-monorepo",
   "version": "1.0.0",
-  "description": "a tool  which automate the pr review and write the comments in the github and bitbucket",
+  "description": "Nx monorepo for PR review automation with Express integration and Next.js SaaS frontend",
   "keywords": [
     "automate",
     "github",
     "bitbucket",
     "pr",
-    "review"
+    "review",
+    "nx",
+    "monorepo"
   ],
   "license": "MIT",
   "author": "Sai Ram Kiran Korlapati, Sam",
   "type": "commonjs",
-  "main": "server.js",
   "scripts": {
-    "test": "vite test"
-  },
-  "dependencies": {
-    "@eslint/js": "^9.33.0",
-    "@octokit/auth-app": "^8.0.2",
-    "@octokit/rest": "^22.0.0",
-    "axios": "^1.11.0",
-    "dotenv": "^17.2.1",
-    "eslint": "^9.32.0",
-    "eslint-plugin-svelte": "^3.11.0",
-    "express": "^5.1.0",
-    "fs": "^0.0.1-security",
-    "node-fetch": "^3.3.2",
-    "typescript-eslint": "^8.39.0"
+    "dev": "nx run-many --target=serve --all",
+    "build": "nx run-many --target=build --all",
+    "serve:express": "nx serve express-integration",
+    "serve:next": "nx serve next-frontend",
+    "start:production": "concurrently \"npm run serve:express\" \"npm run serve:next\"",
+    "build:enterprise": "node scripts/build-enterprise.js",
+    "lint": "nx run-many --target=lint --all",
+    "format": "prettier --write .",
+    "test": "nx run-many --target=test --all",
+    "clean": "nx reset",
+    "graph": "nx graph"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.2.0"
+    "@nx/eslint": "^18.0.0",
+    "@nx/next": "^18.0.0",
+    "@nx/node": "^18.0.0",
+    "@nx/workspace": "^18.0.0",
+    "@nx/js": "^18.0.0",
+    "@nx/eslint-plugin": "^18.0.0",
+    "@nx/plugin": "^18.0.0",
+    "@types/node": "^24.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "nx": "^18.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "concurrently": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
