@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/express-e2e"
+    },
+    {
+      "path": "./apps/express"
+    },
+    {
+      "path": "./apps/next-e2e"
+    },
+    {
+      "path": "./apps/next"
+    },
+    {
+      "path": "./packages/shared"
+    }
+  ]
+}
