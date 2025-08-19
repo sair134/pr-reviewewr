@@ -110,7 +110,7 @@ export default function HomePage() {
                 </div>
                 <p className="ml-16 text-lg leading-6 font-medium text-gray-900">Analytics Dashboard</p>
                 <p className="mt-2 ml-16 text-base text-gray-500">
-                  Track your team's review performance and identify areas for improvement.
+                  Track your team&apos;s review performance and identify areas for improvement.
                 </p>
               </div>
 

@@ -6,8 +6,6 @@ import express, { Request, Response } from 'express';
 import * as path from 'path';
 import { validateLicenseKey } from '@app/shared';
 import { handlePRReview } from './reviewHandler';
-import { exchangeGitHubCode, listGitHubRepos } from './providers/github';
-import { exchangeBitbucketCode, listBitbucketRepos } from './providers/bitbucket';
 
 const app = express();
 
@@ -18,7 +16,6 @@ app.get('/api', (req, res) => {
 });
 
 app.use('/webhook/*', validateLicenseKey);
-app.use('/auth/*', validateLicenseKey);
 app.use('/github/*', validateLicenseKey);
 app.use('/bitbucket/*', validateLicenseKey);
 
@@ -43,49 +40,8 @@ app.post('/webhook/bitbucket', async (req: Request, res: Response) => {
 });
 
 
-app.get('/auth/github', (req: Request, res: Response) => {
-  const params = new URLSearchParams({
-    client_id: process.env['GITHUB_AUTHID']!,
-    redirect_uri: process.env['GITHUB_REDIRECT_URI']!,
-    scope: process.env['GITHUB_SCOPE'] || 'repo'
-  });
-  res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
-});
-
-app.get('/auth/bitbucket', (req: Request, res: Response) => {
-  const params = new URLSearchParams({
-    client_id: process.env['BITBUCKET_CLIENT_ID']!,
-    response_type: 'code',
-    redirect_uri: process.env['BITBUCKET_REDIRECT_URI']!,
-    scope: process.env['BITBUCKET_SCOPE'] || 'repository:read'
-  });
-  res.redirect(`https://bitbucket.org/site/oauth2/authorize?${params.toString()}`);
-});
-
-app.get('/auth/github/callback', async (req: Request, res: Response) => {
-  const code = String(req.query['code'] || '');
-  const token = await exchangeGitHubCode(code, process.env['GITHUB_AUTHID']!, process.env['GITHUB_AUTHSECRET']!, process.env['GITHUB_REDIRECT_URI']!);
-  res.json({ ok: true, provider: 'github', token });
-});
-
-app.get('/auth/bitbucket/callback', async (req: Request, res: Response) => {
-  const code = String(req.query['code'] || '');
-  const data = await exchangeBitbucketCode(code, process.env['BITBUCKET_CLIENT_ID']!, process.env['BITBUCKET_CLIENT_SECRET']!, process.env['BITBUCKET_REDIRECT_URI']!, process.env['BITBUCKET_SCOPE'] || 'repository:read');
-  res.json({ ok: true, provider: 'bitbucket', ...data });
-});
-
-app.get('/github/repos', async (req: Request, res: Response) => {
-  const token = String(req.headers.authorization?.replace('Bearer ', '') || '');
-  const repos = await listGitHubRepos(token);
-  res.json(repos.map(r => ({ fullName: r.full_name, defaultBranch: r.default_branch })));
-});
-
-app.get('/bitbucket/repos', async (req: Request, res: Response) => {
-  const token = String(req.headers.authorization?.replace('Bearer ', '') || '');
-  const workspace = String(req.query['workspace'] || '');
-  const repos = await listBitbucketRepos(token, workspace || undefined);
-  res.json(repos.map((r: any) => ({ fullName: r.full_name, defaultBranch: r.mainbranch?.name || 'main' })));
-});
+// OAuth and repository routes moved to Next.js app
+// These routes are now handled by the Next.js frontend with MongoDB integration
 
 
 

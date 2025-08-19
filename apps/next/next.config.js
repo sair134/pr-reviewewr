@@ -3,6 +3,10 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { composePlugins, withNx } = require('@nx/next');
 
+const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
  **/
