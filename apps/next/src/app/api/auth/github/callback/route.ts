@@ -17,7 +17,6 @@ async function exchangeGitHubCode(code: string, clientId: string, clientSecret: 
       redirect_uri: redirectUri,
     }),
   });
-
   const data = await response.json();
   return data.access_token;
 }
@@ -29,8 +28,9 @@ async function getGitHubUser(accessToken: string) {
       Accept: 'application/vnd.github.v3+json',
     },
   });
-
-  return response.json();
+  const data = await response.json();
+  console.log(data);
+  return data;
 }
 
 export async function GET(request: NextRequest) {
@@ -42,12 +42,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No code provided' }, { status: 400 });
     }
 
+
+
     // Exchange code for access token
     const accessToken = await exchangeGitHubCode(
       code,
-      process.env.GITHUB_ID!,
-      process.env.GITHUB_SECRET!,
-      process.env.GITHUB_REDIRECT_URI || 'http://localhost:4200/api/auth/github/callback'
+      process.env.GITHUB_AUTH_CLIENT || '',
+      process.env.GITHUB_AUTH_SECRET || '',
+      process.env.GITHUB_REDIRECT_URI || 'http://localhost:3000/api/auth/github/callback'
     );
 
     if (!accessToken) {
@@ -81,7 +83,7 @@ export async function GET(request: NextRequest) {
     await user.save();
 
     // Redirect to dashboard with success
-    return NextResponse.redirect('http://localhost:4200/dashboard?connected=github');
+    return NextResponse.redirect('http://localhost:3000/dashboard?connected=github');
   } catch (error) {
     console.error('GitHub OAuth error:', error);
     return NextResponse.json({ error: 'OAuth failed' }, { status: 500 });

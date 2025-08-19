@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
-    client_id: process.env.GITHUB_ID!,
+    client_id: process.env.GITHUB_AUTH_CLIENT!,
     redirect_uri: process.env.GITHUB_REDIRECT_URI || 'http://localhost:3000/api/auth/github/callback',
     scope: process.env.GITHUB_SCOPE || 'repo user',
   });
@@ -11,3 +11,4 @@ export async function GET(request: NextRequest) {
   
   return NextResponse.redirect(authUrl);
 }
+
