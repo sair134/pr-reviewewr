@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
         bitbucketToken: user.bitbucketToken ? 'connected' : null,
         githubUsername: user.githubUsername,
         bitbucketUsername: user.bitbucketUsername,
+        githubId: user.githubId,
+        bitbucketId: user.bitbucketId,
       });
     }
     
@@ -34,6 +36,8 @@ export async function GET(request: NextRequest) {
       bitbucketToken: null,
       githubUsername: null,
       bitbucketUsername: null,
+      githubId: null,
+      bitbucketId: null,
     });
   } catch (error) {
     console.error('Error fetching user:', error);

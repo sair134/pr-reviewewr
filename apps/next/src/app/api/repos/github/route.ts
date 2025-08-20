@@ -12,33 +12,39 @@ async function getGitHubRepos(accessToken: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`GitHub API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('GitHub API error:', response.status, errorText);
+    throw new Error(`GitHub API error: ${response.status} - ${errorText}`);
   }
 
-  return response.json();
+  const repos = await response.json();
+  console.log(`Fetched ${repos.length} repositories from GitHub`);
+  return repos;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
+    console.log('GitHub repos API called');
     
     // Connect to database
     await dbConnect();
+    console.log('Database connected for repos fetch');
     
-    // Find user by token (in a real app, you'd validate the JWT token)
-    const user = await User.findOne({ githubToken: token });
+    // For now, we'll get the first user with a GitHub token
+    // In a real app, you'd get the user from the session/JWT
+    const user = await User.findOne({ githubToken: { $exists: true, $ne: null } });
     
     if (!user || !user.githubToken) {
-      return NextResponse.json({ error: 'User not found or GitHub not connected' }, { status: 404 });
+      console.log('No user found with GitHub token');
+      return NextResponse.json({ error: 'GitHub not connected' }, { status: 404 });
     }
+
+    console.log('Found user with GitHub token:', user.githubUsername);
 
     // Decrypt the token and fetch repositories from GitHub
     const decryptedToken = decryptToken(user.githubToken);
+    console.log('Token decrypted successfully');
+    
     const repos = await getGitHubRepos(decryptedToken);
     
     // Format the response
@@ -55,6 +61,7 @@ export async function GET(request: NextRequest) {
       language: repo.language,
     }));
 
+    console.log(`Returning ${formattedRepos.length} formatted repositories`);
     return NextResponse.json(formattedRepos);
   } catch (error) {
     console.error('Error fetching GitHub repos:', error);

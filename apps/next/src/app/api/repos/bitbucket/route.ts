@@ -13,36 +13,40 @@ async function getBitbucketRepos(accessToken: string, workspace?: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Bitbucket API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('Bitbucket API error:', response.status, errorText);
+    throw new Error(`Bitbucket API error: ${response.status} - ${errorText}`);
   }
 
-  return response.json();
+  const reposData = await response.json();
+  console.log(`Fetched ${reposData.values?.length || 0} repositories from Bitbucket`);
+  return reposData;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { searchParams } = new URL(request.url);
-    const workspace = searchParams.get('workspace');
+    console.log('Bitbucket repos API called');
     
     // Connect to database
     await dbConnect();
+    console.log('Database connected for Bitbucket repos fetch');
     
-    // Find user by token (in a real app, you'd validate the JWT token)
-    const user = await User.findOne({ bitbucketToken: token });
+    // For now, we'll get the first user with a Bitbucket token
+    // In a real app, you'd get the user from the session/JWT
+    const user = await User.findOne({ bitbucketToken: { $exists: true, $ne: null } });
     
     if (!user || !user.bitbucketToken) {
-      return NextResponse.json({ error: 'User not found or Bitbucket not connected' }, { status: 404 });
+      console.log('No user found with Bitbucket token');
+      return NextResponse.json({ error: 'Bitbucket not connected' }, { status: 404 });
     }
+
+    console.log('Found user with Bitbucket token:', user.bitbucketUsername);
 
     // Decrypt the token and fetch repositories from Bitbucket
     const decryptedToken = decryptToken(user.bitbucketToken);
-    const reposData = await getBitbucketRepos(decryptedToken, workspace || undefined);
+    console.log('Bitbucket token decrypted successfully');
+    
+    const reposData = await getBitbucketRepos(decryptedToken);
     
     // Format the response
     const formattedRepos = reposData.values.map((repo: any) => ({
@@ -59,6 +63,7 @@ export async function GET(request: NextRequest) {
       workspace: repo.workspace?.slug,
     }));
 
+    console.log(`Returning ${formattedRepos.length} formatted Bitbucket repositories`);
     return NextResponse.json(formattedRepos);
   } catch (error) {
     console.error('Error fetching Bitbucket repos:', error);
