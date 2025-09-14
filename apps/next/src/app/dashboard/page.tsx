@@ -1,70 +1,128 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useTheme } from '../contexts/ThemeContext';
-import ThemeToggle from '../components/ThemeToggle';
+
+interface Repository {
+  id: string;
+  name: string;
+  fullName: string;
+  description?: string;
+  private: boolean;
+  defaultBranch: string;
+  htmlUrl: string;
+  language?: string;
+  updatedAt: string;
+}
+
+interface User {
+  email?: string;
+  name: string;
+  image?: string;
+  githubToken?: string;
+  bitbucketToken?: string;
+  githubUsername?: string;
+  bitbucketUsername?: string;
+  githubId?: string;
+  bitbucketId?: string;
+}
 
 export default function DashboardPage() {
-  const { theme } = useTheme();
-  const searchParams = useSearchParams();
-  const [subscription, setSubscription] = useState<any>(null);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const isDark = theme === 'dark';
-  const isSuccess = searchParams.get('success') === 'true';
-  const sessionId = searchParams.get('session_id');
+  const [showRepositories, setShowRepositories] = useState(false);
+  const [connectedProviders, setConnectedProviders] = useState<{github: boolean, bitbucket: boolean}>({
+    github: false,
+    bitbucket: false
+  });
+  const searchParams = useSearchParams();
+  const connected = searchParams.get('connected');
 
   useEffect(() => {
-    // Check if user has an active subscription
-    const checkSubscription = async () => {
-      try {
-        const response = await fetch('/api/user/subscription');
-        if (response.ok) {
-          const data = await response.json();
-          setSubscription(data);
-        }
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-      } finally {
-        setLoading(false);
+    fetchUserData();
+    if (connected) {
+      // Show success message for newly connected provider
+      setTimeout(() => {
+        alert(`${connected} connected successfully!`);
+      }, 1000);
+    }
+  }, [connected]);
+
+  const fetchUserData = async () => {
+    try {
+      // In a real app, you'd get the user from the session
+      // For now, we'll simulate with localStorage or make an API call
+      const response = await fetch('/api/user');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setConnectedProviders({
+          github: !!userData.githubToken,
+          bitbucket: !!userData.bitbucketToken
+        });
       }
-    };
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+    setLoading(false);
+  };
 
-    checkSubscription();
-  }, []);
+  const fetchRepositories = async (provider: 'github' | 'bitbucket') => {
+    try {
+      console.log(`Fetching ${provider} repositories...`);
+      const response = await fetch(`/api/repos/${provider}`);
+      
+      if (response.ok) {
+        const repos = await response.json();
+        console.log(`Received ${repos.length} ${provider} repositories`);
+        setRepositories(prev => [...prev, ...repos]);
+      } else {
+        const errorData = await response.json();
+        console.error(`Error fetching ${provider} repos:`, errorData);
+      }
+    } catch (error) {
+      console.error(`Error fetching ${provider} repos:`, error);
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className={`min-h-screen ${isDark ? 'dark-bg' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className={`mt-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleConnectGitHub = () => {
+    window.location.href = '/api/auth/github/connect';
+  };
+
+  const handleConnectBitbucket = () => {
+    window.location.href = '/api/auth/bitbucket/connect';
+  };
+
+  const handleLoadRepositories = () => {
+    setShowRepositories(true);
+    if (connectedProviders.github) fetchRepositories('github');
+    if (connectedProviders.bitbucket) fetchRepositories('bitbucket');
+  };
 
   return (
-    <div className={`min-h-screen ${isDark ? 'dark-bg' : 'bg-gray-50'}`}>
+    <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
-      <nav className={`${isDark ? 'glass-dark' : 'glass'} fixed w-full z-50`}>
+      <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>PR Reviewer</h1>
-              </div>
+              <h1 className="text-xl font-bold text-gray-900">Automate Dashboard</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <ThemeToggle />
+              <Link
+                href="/settings"
+                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Settings
+              </Link>
               <button
-                className={`${isDark ? 'text-white hover:text-purple-200' : 'text-gray-700 hover:text-gray-900'} px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                onClick={() => {
+                  // Handle logout
+                  window.location.href = '/login';
+                }}
+                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Logout
               </button>
@@ -73,155 +131,230 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* Success Message */}
-      {isSuccess && (
-        <div className="pt-16 pb-4">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6 mb-8`}>
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Welcome Section */}
+        <div className="px-4 py-6 sm:px-0">
+          <div className="border-4 border-dashed border-gray-200 rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Welcome {user?.name || 'to Automate'}
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Connect your repositories to start automating your pull request reviews.
+            </p>
+            
+            {/* Connection Options */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Connect Your Accounts</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* GitHub Connection */}
+                <div className="p-4 rounded-lg border bg-gray-50 border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900">GitHub</h4>
+                        <p className="text-sm text-gray-500">
+                          {connectedProviders.github ? `Connected as ${user?.githubUsername}` : 'Not connected'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleConnectGitHub}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-gray-700"
+                    >
+                      {connectedProviders.github ? 'Reconnect' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
-                <div className="ml-3">
-                  <h3 className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    Payment Successful!
-                  </h3>
-                  <p className={`mt-1 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    Thank you for subscribing to PR Reviewer. Your account has been upgraded and you now have access to all premium features.
-                  </p>
+
+                {/* Bitbucket Connection */}
+                <div className="p-4 rounded-lg border bg-gray-50 border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M.778 1.213a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.26a.772.772 0 00.77-.646l3.27-20.03a.772.772 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900">Bitbucket</h4>
+                        <p className="text-sm text-gray-500">
+                          {connectedProviders.bitbucket ? `Connected as ${user?.bitbucketUsername}` : 'Not connected'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleConnectBitbucket}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      {connectedProviders.bitbucket ? 'Reconnect' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Main Content */}
-      <div className="pt-16 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Welcome Section */}
-          <div className="mb-8">
-            <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
-              Welcome to PR Reviewer
-            </h1>
-            <p className={`text-lg ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-              Your AI-powered code review assistant
-            </p>
-          </div>
-
-          {/* Subscription Status */}
-          <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6 mb-8`}>
-            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>
-              Subscription Status
-            </h2>
-            {subscription ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Plan:</span>
-                  <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    {subscription.plan === 'free' ? 'Free Trial' : 
-                     subscription.plan === 'monthly' ? 'Monthly Pro' : 'Team Pro'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Status:</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    subscription.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {subscription.status === 'active' ? 'Active' : 'Trial'}
-                  </span>
-                </div>
-                {subscription.prReviewsUsed && (
-                  <div className="flex items-center justify-between">
-                    <span className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>PR Reviews Used:</span>
-                    <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {subscription.prReviewsUsed} / {subscription.prReviewsLimit || '∞'}
-                    </span>
-                  </div>
-                )}
+            {/* Load Repositories Button - Only show if providers are connected */}
+            {(connectedProviders.github || connectedProviders.bitbucket) && !showRepositories && (
+              <div className="mt-6">
+                <button 
+                  onClick={handleLoadRepositories}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md text-sm font-medium"
+                >
+                  Load Repositories
+                </button>
               </div>
-            ) : (
-              <p className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                Loading subscription details...
-              </p>
+            )}
+            
+            {!connectedProviders.github && !connectedProviders.bitbucket && (
+              <div className="mt-6">
+                <p className="text-sm text-gray-500 mb-4">
+                  Connect at least one account to view repositories
+                </p>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={handleConnectGitHub}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    Connect GitHub
+                  </button>
+                  <button
+                    onClick={handleConnectBitbucket}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M.778 1.213a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.26a.772.772 0 00.77-.646l3.27-20.03a.772.772 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                    </svg>
+                    Connect Bitbucket
+                  </button>
+                </div>
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Quick Actions */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6`}>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
-                Review PR
-              </h3>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-                Submit a pull request for AI-powered review
-              </p>
-              <button className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">
-                Start Review
+        {/* Repositories Section - Only show if repositories are loaded */}
+        {showRepositories && (
+          <div className="px-4 py-6 sm:px-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Connected Repositories</h3>
+              <button
+                onClick={() => setShowRepositories(false)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Hide Repositories
               </button>
             </div>
-
-            <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6`}>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+            {loading ? (
+              <div className="text-gray-500">Loading repositories...</div>
+            ) : repositories.length === 0 ? (
+              <div className="text-gray-500">No repositories found.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {repositories.map((repo) => (
+                  <div key={repo.id} className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="px-4 py-5 sm:p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <h4 className="text-lg font-medium text-gray-900">{repo.name}</h4>
+                            <p className="text-sm text-gray-500">{repo.fullName}</p>
+                            {repo.description && (
+                              <p className="text-sm text-gray-400 mt-1">{repo.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          {repo.private && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mb-1">
+                              Private
+                            </span>
+                          )}
+                          {repo.language && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {repo.language}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-sm text-gray-500">
+                          Branch: {repo.defaultBranch}
+                        </span>
+                        <a
+                          href={repo.htmlUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          View Repository
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
-                View Analytics
-              </h3>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-                Check your review performance and insights
-              </p>
-              <button className="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
-                View Analytics
-              </button>
-            </div>
-
-            <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6`}>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
-                Settings
-              </h3>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-                Manage your account and preferences
-              </p>
-              <button className="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
-                Open Settings
-              </button>
-            </div>
+            )}
           </div>
+        )}
 
-          {/* Recent Activity */}
-          <div className={`${isDark ? 'modern-card-dark' : 'modern-card'} p-6`}>
-            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>
-              Recent Activity
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Welcome to PR Reviewer! Your account is now active.
-                </span>
-                <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                  Just now
-                </span>
-              </div>
-            </div>
+        {/* Recent Activity */}
+        <div className="px-4 py-6 sm:px-0">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul className="divide-y divide-gray-200">
+              <li className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-900">PR Review completed</p>
+                      <p className="text-sm text-gray-500">example/repo-1 #123</p>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">2 hours ago</div>
+                </div>
+              </li>
+              <li className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-900">Repository connected</p>
+                      <p className="text-sm text-gray-500">example/repo-2</p>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">1 day ago</div>
+                </div>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
