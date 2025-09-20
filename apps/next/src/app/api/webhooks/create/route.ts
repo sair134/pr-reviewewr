@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       repositories: repositories.map(repo => ({
-        id: repo._id,
+        id: repo.id, // Use the original repository ID, not MongoDB _id
         name: repo.name,
         fullName: repo.fullName,
         provider: repo.provider,

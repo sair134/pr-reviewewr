@@ -109,16 +109,16 @@ export async function GET(request: NextRequest) {
     console.log('Saving user to database...');
     await user.save();
     console.log('User saved successfully:', { userId: user._id, githubUsername: user.githubUsername });
-
+const base_url = process.env.SERVER_URL || 'http://localhost:3000' ;
     // Redirect based on the type of authorization
     if (state === 'extended_permissions') {
       // Extended permissions - redirect to dashboard with success
       console.log('Redirecting to dashboard with extended permissions');
-      return NextResponse.redirect('http://localhost:3000/dashboard?connected=github&permissions=extended');
+      return NextResponse.redirect(`${base_url}/home?connected=github&permissions=extended`);
     } else {
       // Basic auth - redirect to dashboard (initial login)
       console.log('Redirecting to dashboard with basic permissions');
-      return NextResponse.redirect('http://localhost:3000/dashboard?connected=github&permissions=basic');
+      return NextResponse.redirect(`${base_url}/home?connected=github&permissions=basic`);
     }
   } catch (error) {
     console.error('GitHub OAuth error:', error);

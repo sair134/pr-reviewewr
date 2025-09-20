@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import Navbar from '@/lib/components/Navbar';
 
 interface Repository {
   id: string;
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   });
   const [webhookStatus, setWebhookStatus] = useState<{[key: string]: 'idle' | 'creating' | 'success' | 'error'}>({});
   const [existingWebhooks, setExistingWebhooks] = useState<{[key: string]: boolean}>({});
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false);
   const searchParams = useSearchParams();
   const connected = searchParams.get('connected');
 
@@ -82,12 +84,15 @@ export default function DashboardPage() {
         const repos = await response.json();
         console.log(`Received ${repos.length} ${provider} repositories`);
         setRepositories(prev => [...prev, ...repos]);
+        return repos;
       } else {
         const errorData = await response.json();
         console.error(`Error fetching ${provider} repos:`, errorData);
+        return [];
       }
     } catch (error) {
       console.error(`Error fetching ${provider} repos:`, error);
+      return [];
     }
   };
 
@@ -99,34 +104,52 @@ export default function DashboardPage() {
     window.location.href = '/api/auth/bitbucket/connect';
   };
 
-  const handleLoadRepositories = () => {
+  const handleLoadRepositories = async () => {
     setShowRepositories(true);
-    if (connectedProviders.github) fetchRepositories('github');
-    if (connectedProviders.bitbucket) fetchRepositories('bitbucket');
-    fetchExistingWebhooks();
+    if (connectedProviders.github) await fetchRepositories('github');
+    if (connectedProviders.bitbucket) await fetchRepositories('bitbucket');
+    await fetchExistingWebhooks();
   };
 
   const fetchExistingWebhooks = async () => {
+    setLoadingWebhooks(true);
     try {
       const response = await fetch('/api/webhooks/create');
       if (response.ok) {
         const data = await response.json();
+        console.log('API response for existing webhooks:', data);
+        
         const webhookMap: {[key: string]: boolean} = {};
         
-        data.repositories.forEach((repo: any) => {
-          const repoKey = `${repo.provider}-${repo.id}`;
-          webhookMap[repoKey] = true;
-        });
+        if (data.repositories && Array.isArray(data.repositories)) {
+          data.repositories.forEach((repo: any) => {
+            const repoKey = `${repo.provider}-${repo.id}`;
+            webhookMap[repoKey] = true;
+            console.log(`Added webhook for: ${repoKey} (${repo.fullName})`);
+          });
+        }
         
         setExistingWebhooks(webhookMap);
+        console.log('Final webhook map:', webhookMap);
+      } else {
+        console.error('Failed to fetch existing webhooks:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching existing webhooks:', error);
+    } finally {
+      setLoadingWebhooks(false);
     }
   };
 
   const handleCreateWebhook = async (repo: Repository, provider: 'github' | 'bitbucket') => {
     const repoKey = `${provider}-${repo.id}`;
+    
+    // Don't proceed if webhook already exists
+    if (existingWebhooks[repoKey]) {
+      alert(`Webhook is already configured for ${repo.fullName}. The system is already monitoring this repository for pull requests.`);
+      return;
+    }
+    
     setWebhookStatus(prev => ({ ...prev, [repoKey]: 'creating' }));
 
     try {
@@ -149,8 +172,15 @@ export default function DashboardPage() {
         setExistingWebhooks(prev => ({ ...prev, [repoKey]: true }));
         alert(`Webhook created successfully for ${repo.fullName}! The system will now automatically review pull requests.`);
       } else {
-        setWebhookStatus(prev => ({ ...prev, [repoKey]: 'error' }));
-        alert(`Failed to create webhook: ${result.error}`);
+        // Check if the error is because webhook already exists
+        if (result.error && result.error.includes('already has webhook')) {
+          setWebhookStatus(prev => ({ ...prev, [repoKey]: 'success' }));
+          setExistingWebhooks(prev => ({ ...prev, [repoKey]: true }));
+          alert(`Webhook is already configured for ${repo.fullName}. The system is already monitoring this repository for pull requests.`);
+        } else {
+          setWebhookStatus(prev => ({ ...prev, [repoKey]: 'error' }));
+          alert(`Failed to create webhook: ${result.error}`);
+        }
       }
     } catch (error) {
       setWebhookStatus(prev => ({ ...prev, [repoKey]: 'error' }));
@@ -161,34 +191,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">Automate Dashboard</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/settings"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Settings
-              </Link>
-              <button
-                onClick={() => {
-                  // Handle logout
-                  window.location.href = '/login';
-                }}
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Welcome Section */}
@@ -234,7 +236,7 @@ export default function DashboardPage() {
                 <div className="p-4 rounded-lg border bg-gray-50 border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 bg-secondary-600 rounded-full flex items-center justify-center mr-3">
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mr-3">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M.778 1.213a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.26a.772.772 0 00.77-.646l3.27-20.03a.772.772 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
                         </svg>
@@ -248,7 +250,7 @@ export default function DashboardPage() {
                     </div>
                     <button
                       onClick={handleConnectBitbucket}
-                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-secondary-600 hover:bg-secondary-700"
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                     >
                       {connectedProviders.bitbucket ? 'Reconnect' : 'Connect'}
                     </button>
@@ -311,8 +313,8 @@ export default function DashboardPage() {
                 Hide Repositories
               </button>
             </div>
-            {loading ? (
-              <div className="text-gray-500">Loading repositories...</div>
+            {loading || loadingWebhooks ? (
+              <div className="text-gray-500">Loading repositories and webhook status...</div>
             ) : repositories.length === 0 ? (
               <div className="text-gray-500">No repositories found.</div>
             ) : (
@@ -323,10 +325,13 @@ export default function DashboardPage() {
                   const repoKey = `${provider}-${repo.id}`;
                   const hasExistingWebhook = existingWebhooks[repoKey];
                   const status = hasExistingWebhook ? 'success' : (webhookStatus[repoKey] || 'idle');
+                  
+                  // Debug logging
+                  console.log(`Repo: ${repo.name}, Provider: ${provider}, Key: ${repoKey}, HasWebhook: ${hasExistingWebhook}, Status: ${status}`);
 
                   return (
-                    <div key={repo.id} className="bg-white overflow-hidden shadow rounded-lg">
-                      <div className="px-4 py-5 sm:p-6">
+                    <div key={repo.id} className="bg-white overflow-hidden shadow rounded-lg flex flex-col h-full">
+                      <div className="px-4 py-5 sm:p-6 flex-1 flex flex-col">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -357,7 +362,7 @@ export default function DashboardPage() {
                               </span>
                             )}
                             {repo.language && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {repo.language}
                               </span>
                             )}
@@ -371,18 +376,20 @@ export default function DashboardPage() {
                             href={repo.htmlUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-primary-600 hover:text-primary-800"
+                            className="text-sm text-blue-600 hover:text-blue-800"
                           >
                             View Repository
                           </a>
                         </div>
-                        <div className="mt-4">
+                        <div className="mt-4 mt-auto">
                           <button
                             onClick={() => handleCreateWebhook(repo, provider)}
                             disabled={status === 'creating' || hasExistingWebhook}
-                            className={`w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                            className={`w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white min-h-[40px] ${
                               status === 'creating' || hasExistingWebhook
                                 ? 'bg-gray-400 cursor-not-allowed'
+                                : status === 'connected'
+                                ? 'bg-green-600 hover:bg-green-700'
                                 : status === 'success'
                                 ? 'bg-green-600 hover:bg-green-700'
                                 : status === 'error'
@@ -407,7 +414,7 @@ export default function DashboardPage() {
                               </svg>
                             )}
                             {status === 'creating' && 'Creating Webhook...'}
-                            {status === 'success' && 'Webhook Active'}
+                            {(status === 'success' || hasExistingWebhook) && 'Already Connected'}
                             {status === 'error' && 'Retry Setup'}
                             {status === 'idle' && 'Review this PR'}
                           </button>
@@ -430,8 +437,8 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
