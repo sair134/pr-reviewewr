@@ -137,8 +137,8 @@ export function verifyWebhookSignature(
       .update(payload)
       .digest('hex')}`;
     return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
+      Buffer.from(signature) as any,
+      Buffer.from(expectedSignature) as any
     );
   } else if (provider === 'bitbucket') {
     const expectedSignature = crypto
@@ -146,8 +146,8 @@ export function verifyWebhookSignature(
       .update(payload)
       .digest('hex');
     return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
+      Buffer.from(signature) as any,
+      Buffer.from(expectedSignature) as any
     );
   }
   return false;

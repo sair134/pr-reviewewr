@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { validateEmail } from '@automate/shared/utils';
+import { validateEmail } from '@app/shared';
 
 // In a real app, this would be in a database
 const MOCK_USERS: Array<{

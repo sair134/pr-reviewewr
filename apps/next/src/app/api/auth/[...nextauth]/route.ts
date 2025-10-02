@@ -70,14 +70,13 @@ const handler = NextAuth({
     },
     async session({ session, token }) {
       // Send properties to the client
-      session.accessToken = token.accessToken;
-      session.provider = token.provider;
+      (session as any).accessToken = token.accessToken;
+      (session as any).provider = token.provider;
       return session;
     },
   },
   pages: {
     signIn: '/login',
-    signUp: '/signup',
   },
   session: {
     strategy: 'jwt',
