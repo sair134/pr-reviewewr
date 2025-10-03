@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
+    const {nextUrl} = request;
     
     console.log('GitHub callback received:', { code: !!code, state });
     
@@ -114,11 +115,11 @@ export async function GET(request: NextRequest) {
     if (state === 'extended_permissions') {
       // Extended permissions - redirect to dashboard with success
       console.log('Redirecting to dashboard with extended permissions');
-      return NextResponse.redirect('http://localhost:3000/dashboard?connected=github&permissions=extended');
+      return NextResponse.redirect(new URL('/dashboard?connected=github&permissions=extended', nextUrl));
     } else {
       // Basic auth - redirect to dashboard (initial login)
       console.log('Redirecting to dashboard with basic permissions');
-      return NextResponse.redirect('http://localhost:3000/dashboard?connected=github&permissions=basic');
+      return NextResponse.redirect(new URL('/dashboard?connected=github&permissions=basic', nextUrl));
     }
   } catch (error) {
     console.error('GitHub OAuth error:', error);
